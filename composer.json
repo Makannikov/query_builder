@@ -1,6 +1,6 @@
 {
-  "name": "makan/test_package",
-  "description": "Test package composer",
+  "name": "makan/query_builder",
+  "description": "Easy PDO Query builder for my projects",
   "license": "proprietary",
   "authors": [
     {
