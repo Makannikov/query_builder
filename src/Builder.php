@@ -1,14 +1,14 @@
 <?php
 
-namespace Framework\Core\database;
+namespace Makan\QueryBuilder;
 
 use PDOException;
 use Closure;
 
-class Database extends \PDO
+class Builder extends \PDO
 {
 
-    private $prefix = 'prefix_';
+    private $prefix = '';
     private $table;
     private $columns = ['*'];
     private $wheres;
@@ -39,7 +39,7 @@ class Database extends \PDO
             $query = "SET NAMES utf8";
             $this->query($query);
         } catch (PDOException $e) {
-            echo 'Ошибка при подключении к базе данных: ' . $e->getMessage();
+            echo 'Ошибка при подключении к базе данных: <br>' . $e->getMessage();
         }
     }
 

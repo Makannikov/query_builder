@@ -1,18 +1,18 @@
 <?php
 
-namespace Framework\Core\database;
+namespace Makan\QueryBuilder;
+
 class DB {
 
     public static function table($table){
-        return (new Database())->table($table);
+        return (new Builder())->table($table);
     }
 
     public static function query($statement){
-        return (new Database())->query($statement);
+        return (new Builder())->query($statement);
     }
 
-
     public static function pdo(){
-        return (new Database());
+        return (new Builder());
     }
 }

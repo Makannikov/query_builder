@@ -1,4 +1,5 @@
 <?php
+namespace Makan\QueryBuilder;
 
 class Pagination
 {
