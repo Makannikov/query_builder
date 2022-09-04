@@ -2,19 +2,19 @@
   "name": "makan/query_builder",
   "description": "Easy PDO Query builder for my projects",
   "license": "proprietary",
+  "minimum-stability": "dev",
   "authors": [
     {
-      "name": "Andrew",
-      "email": "makannikov@gmail.com"
+      "name": "Andrew"
     }
   ],
   "require": {
     "php": ">=7.0"
   },
   "require-dev": {
-    "phpunit/phpunit": "9.5.24"
+    "phpunit/phpunit": "^9.5.24"
   },
   "autoload": {
-    "classmap": ["scr"]
+    "classmap": ["src"]
   }
 }
