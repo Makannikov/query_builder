@@ -5,8 +5,9 @@ namespace Makan\QueryBuilder;
 use PDOException;
 use Closure;
 
-class Builder extends \PDO
+class Builder
 {
+	private $connection;
 
     private $prefix = '';
     private $table;
@@ -26,22 +27,9 @@ class Builder extends \PDO
     private $appQueries;
     private $sql;
 
-    public function __construct()
-    {
-        try {
-            $options = array(
-                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_OBJ,
-                //\PDO::ATTR_PERSISTENT => true
-            );
-
-            parent::__construct('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME, DB_USER, DB_PASS, $options);
-            $query = "SET NAMES utf8";
-            $this->query($query);
-        } catch (PDOException $e) {
-            echo 'Ошибка при подключении к базе данных: <br>' . $e->getMessage();
-        }
-    }
+	public function __construct($connection){
+		$this->connection = $connection;
+	}
 
 
     public function table($table)
@@ -205,17 +193,14 @@ class Builder extends \PDO
     private function compileSelect()
     {
         try {
-
-
             $query = "SELECT " . $this->compileColumns($this->columns) . " FROM " . $this->prefix . $this->table . " as " . $this->table . " " .
+				$this->compileJoins($this->joins) .
+				$this->compileWheres($this->wheres) .
+				$this->compileOrders($this->orders) .
+				$this->compileLimit($this->limit, $this->offset);
 
-                $this->compileJoins($this->joins) .
-                $this->compileWheres($this->wheres) .
-                $this->compileOrders($this->orders) .
-                $this->compileLimit($this->limit, $this->offset);
 
-
-            $result = $this->prepare($query);
+            $result = $this->connection->prepare($query);
             $values = $this->wheresBindParam();
             $this->saveQueries($query, $values);
             $result->execute($values);
@@ -223,8 +208,7 @@ class Builder extends \PDO
             return $result;
 
         } catch (PDOException $e) {
-            exit('<pre>Ошибка: ' . $e->getMessage() . '; <br>Line: ' . $e->getLine() . '; <br>SQL: ' . $query . '; <br>Params: <br>' . print_r($this->wheres, true) . '</pre>');
-            return null;
+			throw new PDOException('Ошибка: ' . $e->getMessage() . '; <br>Line: ' . $e->getLine() . '; <br>SQL: ' . $query . '; <br>Params: <br>' . print_r($this->wheres, true));
         }
 
     }
@@ -239,30 +223,29 @@ class Builder extends \PDO
 //** Выводит одну запись из таблицы */
     public function first()
     {
-        $this->limit(1);
-        return $this->compileSelect()->fetch();
+        return $this
+			->limit(1)
+			->compileSelect()
+			->fetch();
     }
 
     public function insert($values, $id_name = 'id')
     {
-
         if (empty($values)) {
             return true;
         }
 
-
-// Если передали параметры для 1й записи.
+		// Если передали параметры для 1й записи.
         if (!is_array(reset($values))) {
             $values = [$values];
         }
 
-// Here, we will sort the insert keys for every record so that each insert is
-// in the same order for the record. We need to make sure this is the case
-// so there are not any errors or problems when inserting these records.
+		// Here, we will sort the insert keys for every record so that each insert is
+		// in the same order for the record. We need to make sure this is the case
+		// so there are not any errors or problems when inserting these records.
         else {
             foreach ($values as $key => $value) {
                 ksort($value);
-
                 $values[$key] = $value;
             }
         }
@@ -271,25 +254,24 @@ class Builder extends \PDO
         try {
 
             $columns = array_keys(reset($values));
-            $placeholders = str_repeat('?,', count($columns) - 1) . '?';
+            $placeholders = rtrim(str_repeat('?,', count($columns)), ',');
             $columns = "`" . implode('`, `', $columns) . "`";
 
-
             $query = "INSERT INTO " . $this->prefix . $this->table . " (" . $columns . ") VALUES ( " . $placeholders . " )  ";
-            $result = $this->prepare($query);
+            $result = $this->connection->prepare($query);
 
 
-            $this->beginTransaction();
+            $this->connection->beginTransaction();
             foreach ($values as $item) {
 
                 $item = array_values($item); // сбрасываем ключи массива в числовые
                 $this->saveQueries($query, $item);
                 $result->execute($item);
-                $this->lastInsertIds[] = parent::lastInsertId($id_name);
+                $this->lastInsertIds[] = $this->connection::lastInsertId($id_name);
 
             }
 
-            $this->commit();
+            $this->connection->commit();
 
             return $this;
 
@@ -299,8 +281,6 @@ class Builder extends \PDO
 //Logs::Instance()->write('database', 'Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ' . Tools::my_print_r($params) . '');
 //echo ('Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ');
             throw $e;
-
-//
         }
 
     }
@@ -349,44 +329,43 @@ class Builder extends \PDO
     }
 
 
-    private function compileWheres($wheres)
+    private function compileWheres($where_condition) :string
     {
+		if (!is_array($where_condition))
+			return '';
 
 
-        if (is_array($wheres)) {
-            $sql = '';
-            $i = 0;
-            foreach ($wheres as $key => $wheres) {
+		$sql = '';
+		$i = 0;
+		foreach ($where_condition as $wheres) {
+
+			if (isset($wheres['str'])) {
+				$sql .= $wheres['str'];
+				if ($i == 0) $i++;
+				if ($i > 1) $i = 0;
+				continue;
+			}
 
 
-                if ($wheres['str']) {
-                    $sql .= $wheres['str'];
-                    if ($i == 0) $i++;
-                    if ($i > 1) $i = 0;
-                } else {
-                    foreach ($wheres as $key => $where) {
-                        $ii++;
-                        if ($i == 1) {
-                            $where['boolean'] = '';
-                            $i++;
-                        }
+			foreach ($wheres as $key => $where) {
+				if ($i == 1) {
+					$where['boolean'] = '';
+					$i++;
+				}
 
-                        if ($where['type'] == 'NOT IN' or $where['type'] == 'IN') {
-                            $in = str_repeat('?,', count($where['values']) - 1) . '?';
-                            $sql .= $where['boolean'] . ' ' . $this->addQuotesForColumn($where['column']) . ' ' . $where['type'] . "( " . $in . " )";
-                        } else {
-                            $sql .= $where['boolean'] . ' ' . $this->addQuotesForColumn($where['column']) . ' ' . $where['operator'] . ' ? ';
-                        }
+				if ($where['type'] == 'NOT IN' or $where['type'] == 'IN') {
+					$in = str_repeat('?,', count($where['values']) - 1) . '?';
+					$sql .= $where['boolean'] . ' ' . $this->addQuotesForColumn($where['column']) . ' ' . $where['type'] . "( " . $in . " )";
+				} else {
+					$sql .= $where['boolean'] . ' ' . $this->addQuotesForColumn($where['column']) . ' ' . $where['operator'] . ' ? ';
+				}
 
-// AND column = ?
-                    }
-                }
+			}
 
 
-            }
-            return ' WHERE ' . ltrim($sql, 'and');
-        }
-        return '';
+		}
+
+		return ' WHERE ' . ltrim($sql, 'and');
     }
 
 
@@ -407,17 +386,12 @@ class Builder extends \PDO
     }
 
 
-    public function compileLimit($limit, $offset = 0)
+    private function compileLimit(int $limit, int $offset = 0) :string
     {
-        if ($limit) {
+        if (!$limit)
+			return '';
 
-
-            $offset = (int)$offset . ', ';
-
-            $query .= ' LIMIT ' . $offset . (int)$limit;
-
-            return $query;
-        }
+		return  sprintf(' LIMIT %d, %d', $offset, $limit);
     }
 
     public function compileOrders($orders)
@@ -436,74 +410,60 @@ class Builder extends \PDO
         }
 
         return rtrim($sql, ' ,');
-
     }
 
 
-    private function wheresBindParam()
+    private function wheresBindParam() :array
     {
+		$values = [];
+
         if (is_array($this->wheres)) {
             foreach ($this->wheres as $wheres) {
 
-// Если это скобочки ( ) для группы условий , то пропускаем цикл
-                if ($wheres['str'])
+				// Если это скобочки ( ) для группы условий , то пропускаем цикл
+                if (isset($wheres['str']))
                     continue;
 
                 foreach ($wheres as $where) {
 
-// Перебираем условие IN
+					// Перебираем условие IN
                     if ($where['type'] == 'NOT IN' or $where['type'] == 'IN') {
 
                         foreach ($where['values'] as $in) {
                             $values[] = $in;
                         }
 
-// Перебираем обычные условия WHERE
+					// Перебираем обычные условия WHERE
                     } else {
                         $values[] = $where['value'];
                     }
                 }
-
-
             }
-
-            return $values;
         }
+		return $values;
     }
-
-
-
-
-
-
 
 //**  УДАЛЕНИЕ  */
 //
 
     public function delete($id = null)
     {
-// If an ID is passed to the method, we will set the where clause to check the
-// ID to let developers to simply and quickly remove a single row from this
-// database without manually specifying the "where" clauses on the query.
+		// If an ID is passed to the method, we will set the where clause to check the
+		// ID to let developers to simply and quickly remove a single row from this
+		// database without manually specifying the "where" clauses on the query.
         if (!is_null($id)) {
             $this->where('id', '=', $id);
         }
 
-
         $wheres = $this->compileWheres($this->wheres);
 
         try {
-
-
             $query = "DELETE FROM " . $this->prefix . $this->table . "  " . $wheres;
-
-            $result = $this->prepare($query);
-
+            $result = $this->connection->prepare($query);
 
             $values = $this->wheresBindParam();
             $this->saveQueries($query, $values);
             $result->execute($values);
-
 
         } catch (PDOException $e) {
             exit('Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ' . Tools::my_print_r($params) . '');
@@ -515,24 +475,18 @@ class Builder extends \PDO
 
     public function update($values)
     {
-
         if (empty($values)) {
-            return true;
+            return false;
         }
 
-
         try {
-
             foreach ($values as $key => $item) {
                 $params .= ' `' . $key . '` = ? ,';
             }
-
             $wheres = $this->compileWheres($this->wheres);
 
-
             $query = "UPDATE " . $this->prefix . $this->table . " SET " . rtrim($params, ',') . $wheres;
-            $result = $this->prepare($query);
-
+            $result = $this->connection->prepare($query);
 
             $values = array_values(
                 array_merge($values, $this->wheresBindParam())
@@ -543,74 +497,65 @@ class Builder extends \PDO
             return $this;
 
         } catch (PDOException $e) {
-
-//Logs::Instance()->write('database', 'Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ' . Tools::my_print_r($params) . '');
-//echo ('Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ');
+			//Logs::Instance()->write('database', 'Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ' . Tools::my_print_r($params) . '');
+			//echo ('Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ');
             throw $e;
-
-//
         }
 
     }
 
 
     /** ----======================   JOINS ============= -------------------- */
-
-
     public function join($table, $first, $operator = null, $second = null, $type = 'inner' /*, $where = false */)
     {
-        $method = $where ? 'where' : 'on';
+        $method = isset($where) ? 'where' : 'on';
 
-// Этот метод я пока оставлю, сейчас он не важен, но потом, как обычно через пару лет я возможно его доделаю
+		// Этот метод я пока оставлю, сейчас он не важен, но потом,
+		// как обычно через пару лет я возможно его доделаю
         if ($first instanceof Closure) {
+			$this->joins[] = [
+				'table' => $table,
+				'type' => $type
+			];
 
-            $this->joins[] = [
-                'table' => $table,
-                'type' => $type
-            ];
-
-            call_user_func($first, $this);
-//$this->joins[] = $join;
-//$this->addBinding($join->getBindings(), 'join');
-        } else {
-
-
-            $this->joins[] = [
-                'table' => $table,
-                'first' => $first,
-                'operator' => $operator,
-                'second' => $second,
-                'type' => $type,
-                'method' => $method
-            ];
-        }
+			call_user_func($first, $this);
+		} else {
+			$this->joins[] = [
+				'table' => $table,
+				'first' => $first,
+				'operator' => $operator,
+				'second' => $second,
+				'type' => $type,
+				'method' => $method
+			];
+		}
 
         return $this;
     }
 
-    public function leftJoin($table, $first, $operator = null, $second = null)
-    {
+    public function leftJoin($table, $first, $operator = null, $second = null): Builder
+	{
         return $this->join($table, $first, $operator, $second, 'left');
     }
 
-    public function crossJoin($table, $first, $operator = null, $second = null)
-    {
+    public function crossJoin($table, $first, $operator = null, $second = null): Builder
+	{
         return $this->join($table, $first, $operator, $second, 'cross');
     }
 
-    public function rightJoin($table, $first, $operator = null, $second = null)
-    {
+    public function rightJoin($table, $first, $operator = null, $second = null): Builder
+	{
         return $this->join($table, $first, $operator, $second, 'right');
     }
 
 
-    public function andOn($first, $operator = null, $second = null)
-    {
+    public function andOn($first, $operator = null, $second = null): Builder
+	{
         return $this->on($first, $operator, $second, 'and');
     }
 
-    public function orOn($first, $operator = null, $second = null)
-    {
+    public function orOn($first, $operator = null, $second = null): Builder
+	{
         return $this->on($first, $operator, $second, 'or');
     }
 
@@ -620,61 +565,45 @@ class Builder extends \PDO
         if (!is_array($this->joins))
             return false;
 
-
         $str = ' ';
 
         foreach ($this->joins as $join) {
-
-
             if ($join['table'] and $join['type']) {
                 $str .= $join['type'] . ' JOIN ' . $this->prefix . $join['table'] . ' ' . $join['table'] . ' ON ';
-
                 $on = true;
             }
 
-            if ($on == false and $join['boolean'])
+            if (!$on and $join['boolean'])
                 $str .= ' ' . $join['boolean'] . ' ';
 
-            if ($join['boolean'])
+            if (isset($join['boolean']))
                 $on = false;
 
-
             $str .= $join['first'] . ' ' . $join['operator'] . ' ' . $join['second'] . ' ';
-
         }
         return $str;
-
     }
 
     public function on($first, $operator = null, $second = null, $boolean = 'and')
     {
-
         $this->joins[] = [
             'first' => $first,
             'operator' => $operator,
             'second' => $second,
             'boolean' => $boolean
         ];
-
         return $this;
     }
 
 
     public function count()
     {
-
         try {
-
-
             $query = "SELECT count(*) as `count` FROM " . $this->prefix . $this->table . " as " . $this->table . " " .
+				$this->compileJoins($this->joins) .
+				$this->compileWheres($this->wheres);
 
-
-                $this->compileJoins($this->joins) .
-                $this->compileWheres($this->wheres);
-
-            $result = $this->prepare($query);
-
-
+            $result = $this->connection->prepare($query);
             $values = $this->wheresBindParam();
             $this->saveQueries($query, $values);
             $result->execute($values);
@@ -686,20 +615,14 @@ class Builder extends \PDO
             exit('<pre>Ошибка: ' . $e->getMessage() . '; <br>Line: ' . $e->getLine() . '; <br>SQL: ' . $query . '; <br>Params: <br>' . print_r($this->wheres, true) . '</pre>');
             return null;
         }
-
     }
 
     public function paginate($currentPage, $perPage = false)
     {
-
         $paginator = new Pagination($this->count(), $currentPage, $perPage);
-
         $this->limit($paginator->limit(), $paginator->offset());
-
         return (object)['pagination' => $paginator, 'rows' => $this->get()];
-
     }
-
 
     private function saveQueries($query, $params = array())
     {
@@ -716,13 +639,10 @@ class Builder extends \PDO
     }
 
 
-    public function withLang($column = false)
-    {
-
-        if (!$column)
-            $column = $this->table . '.lang';
-
-        return $this->where($column, locale());
-    }
-
+    //public function withLang($column = false)
+    //{
+    //    if (!$column)
+    //        $column = $this->table . '.lang';
+    //    return $this->where($column, locale());
+    //}
 }
