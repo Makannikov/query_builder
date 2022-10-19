@@ -380,9 +380,13 @@ class Builder
             return true;
 
         $data = explode('.', $column);
-        if ($data[1])
-            return '`' . $data[0] . '`.' . $data[1];
-        return '`' . $data[0] . '`';
+
+		$column = '`' . $data[0] . '`';
+
+        if (isset($data[1]))
+			$column .= '.' . $data[1];
+
+        return $column;
     }
 
 
