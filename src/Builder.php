@@ -2,11 +2,15 @@
 
 namespace Makan\QueryBuilder;
 
+use PDO;
 use PDOException;
 use Closure;
 
 class Builder
 {
+	/**
+	 * @var PDO $connection
+	 */
 	private $connection;
 
     private $prefix = '';
@@ -24,6 +28,7 @@ class Builder
     private $basicGroup = 0;
     private $lastInsertIds = [];
 
+    private $query;
     private $appQueries;
     private $sql;
 
@@ -214,19 +219,21 @@ class Builder
     }
 
 //** Выводит множество записей из таблицы */
-    public function get()
+    public function get($class = null)
     {
-        return $this->compileSelect()->fetchAll();
+        return $this->compileSelect()->fetchAll(PDO::FETCH_CLASS, $class ?? '');
     }
 
 
 //** Выводит одну запись из таблицы */
-    public function first()
+
+    public function first($class = null) : mixed
     {
-        return $this
+        $res = $this
 			->limit(1)
-			->compileSelect()
-			->fetch();
+			->compileSelect();
+
+		return $class ? $res->fetchObject($class) : $res->fetch();
     }
 
     public function insert($values, $id_name = 'id')

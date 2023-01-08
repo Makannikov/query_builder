@@ -7,6 +7,9 @@ use PDOException;
 
 class DB {
 
+	/**
+	 * @var PDO $connection
+	 */
 	private static $connection;
 
 	// Подключение к БД
@@ -14,8 +17,8 @@ class DB {
 
 		try {
 			$options = array(
-				\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-				\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_OBJ,
+				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+				PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ,
 				//\PDO::ATTR_PERSISTENT => true
 			);
 
