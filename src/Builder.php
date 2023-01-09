@@ -20,7 +20,7 @@ class Builder
     private $joins;
     private $order;
     private $limit = false;
-    private $offset;
+    private int $offset = 0;
     private $orders;
 
     private $nested; // указывает на объединение условия WHERE
@@ -31,6 +31,8 @@ class Builder
     private $query;
     private $appQueries;
     private $sql;
+
+    private string $asObject;
 
 	public function __construct($connection){
 		$this->connection = $connection;
@@ -580,7 +582,7 @@ class Builder
 
         foreach ($this->joins as $join) {
             if ($join['table'] and $join['type']) {
-                $str .= $join['type'] . ' JOIN ' . $this->prefix . $join['table'] . ' ' . $join['table'] . ' ON ';
+                $str .= $join['type'] . ' JOIN ' . $this->prefix . $join['table'] . ' AS ' . $join['table'] . ' ON ';
                 $on = true;
             }
 
@@ -632,7 +634,14 @@ class Builder
     {
         $paginator = new Pagination($this->count(), $currentPage, $perPage);
         $this->limit($paginator->limit(), $paginator->offset());
-        return (object)['pagination' => $paginator, 'rows' => $this->get()];
+        return (object)['pagination' => $paginator, 'rows' => $this->get($this->asObject ?? null)];
+    }
+
+    //TODO Продумать, как реализовать лучше (Пока сделал наскоряк)
+    public function paginateAsObject($className, $currentPage, $perPage = false): object
+    {
+        $this->asObject = $className;
+        return $this->paginate($currentPage, $perPage);
     }
 
     private function saveQueries($query, $params = array())
