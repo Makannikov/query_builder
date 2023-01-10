@@ -111,7 +111,7 @@ class Builder
     {
         $this->nested = 1;
         $this->nestedGroup++;
-        $this->wheres[] = ['str' => $boolean . ' ( '];
+        $this->wheres[] = empty($this->wheres) ? ['str' => ' ( '] : ['str' => $boolean . ' ( '];
         $callback($this);
         $this->wheres[] = ['str' => ' ) '];
         $this->nested = 0;
