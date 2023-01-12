@@ -20,7 +20,7 @@ class Pagination
     public array $tmpl;
 
     const PAGINATION_KEY_ACTION = 'page';
-    const PAGINATION_LINKS = 5;
+    const PAGINATION_LINKS = 2;
     const DEFAULT_PAGE_RESULTS = 15;
 
 
