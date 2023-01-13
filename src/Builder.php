@@ -634,18 +634,11 @@ class Builder
         }
     }
 
-    public function paginate($currentPage, $perPage = false)
+    public function paginate($currentPage, $perPage = false, $class = false)
     {
         $paginator = new Pagination($this->count(), $currentPage, $perPage);
         $this->limit($paginator->limit(), $paginator->offset());
-        return (object)['pagination' => $paginator, 'rows' => $this->get($this->asObject ?? null)];
-    }
-
-    //TODO Продумать, как реализовать лучше (Пока сделал наскоряк)
-    public function paginateAsObject($className, $currentPage, $perPage = false): object
-    {
-        $this->asObject = $className;
-        return $this->paginate($currentPage, $perPage);
+        return (object)['pagination' => $paginator, 'rows' => $this->get($class ?? null)];
     }
 
     private function saveQueries($query, $params = array())
