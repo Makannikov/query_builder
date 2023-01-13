@@ -221,9 +221,13 @@ class Builder
     }
 
 //** Выводит множество записей из таблицы */
-    public function get($class = null)
+    public function get($class = null): bool|array
     {
-        return $this->compileSelect()->fetchAll(PDO::FETCH_CLASS, $class ?? '');
+        if($class){
+            return $this->compileSelect()->fetchAll(PDO::FETCH_CLASS, $class);
+        }
+
+        return $this->compileSelect()->fetchAll();
     }
 
 
