@@ -4,6 +4,7 @@ namespace Makan\QueryBuilder;
 
 use PDO;
 use PDOException;
+use PDOStatement;
 
 class DB {
 
@@ -50,8 +51,9 @@ class DB {
         return (new Builder(self::$connection))->table($table);
     }
 
-    public static function query($statement){
-        return (new Builder(self::$connection))->query($statement);
+    public static function query($statement): bool|PDOStatement
+    {
+        return self::$connection->query($statement);
     }
 
 	// Вернет массив с запросами и временем выполнения
