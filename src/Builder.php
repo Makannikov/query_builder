@@ -280,7 +280,7 @@ class Builder
                 $item = array_values($item); // сбрасываем ключи массива в числовые
                 $this->saveQueries($query, $item);
                 $result->execute($item);
-                $this->lastInsertIds[] = $this->connection::lastInsertId($id_name);
+                $this->lastInsertIds[] = $this->connection->lastInsertId($id_name);
 
             }
 
