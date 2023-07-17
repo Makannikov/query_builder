@@ -290,7 +290,7 @@ class Builder
 
         } catch (PDOException $e) {
 
-            $this->rollBack();
+            $this->connection->rollBack();
 //Logs::Instance()->write('database', 'Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ' . Tools::my_print_r($params) . '');
 //echo ('Ошибка: ' . $e->getMessage() . '; Line: ' . $e->getLine() . '; SQL: ' . $sql . '; Params: ');
             throw $e;
