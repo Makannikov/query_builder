@@ -496,6 +496,7 @@ class Builder
             return false;
         }
 
+        $params = '';
         try {
             foreach ($values as $key => $item) {
                 $params .= ' `' . $key . '` = ? ,';
